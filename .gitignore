@@ -1,0 +1,6 @@
+ctimer
+.vscode
+*.dSYM
+.DS_Store
+*.o
+*.pyc
