@@ -8,7 +8,6 @@
  * Most could be in C, but I like C++'s grammar sugars like r-strings.
  */
 
-#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 /* C++ std */
@@ -18,7 +17,7 @@
 #include <unistd.h>
 #include <sys/errno.h>
 #include <sys/resource.h>
-#include <sys/time.h>
+#include <sys/times.h>
 #include <sys/wait.h>
 
 static bool g_verbose = false;
@@ -34,15 +33,18 @@ static bool g_verbose = false;
     fprintf(stderr, "[Error] ");          \
     fprintf(stderr, format, __VA_ARGS__); \
     fprintf(stderr, "\n");
-#define CHECKED_SYSCALL(expr, description) \
-    if ((expr) == -1) {                    \
+#define CHECKED_SYSCALL(expr, description, error_action) \
+    if ((expr) == -1) {                                  \
         ERROR_FMT("syscall %s: %s", description, strerror(errno)); \
-        return 1;                          \
+        error_action;                                    \
     }
+#define PARENT_ERR return 1;
+#define CHILD_ERR  abort();
 
+enum ChildExit_t { kNormalExit, kSignalExit, kOtherExit, kTimeout };
 static const char *kStatsFilenameEnvVar = "CTIMER_STATS";
 static const char *kTimeoutEnvVar = "CTIMER_TIMEOUT";
-static const unsigned int kDefaultTimeoutMillisec = 2000;
+static const unsigned int kDefaultTimeoutSec = 2;
 static const char *helpMessage = R"(usage: ctimer [-h] [-v] program [args ...]
 
 ctimer: measure a program's processor time
@@ -57,15 +59,49 @@ optional arguments:
 
 optional environment vairables:
     %-15s  file to write stats, default: (stdout)
-    %-15s  processor time limit (ms), default: %d
+    %-15s  processor time limit (sec), default: %d
 )";
+
+static const char *kReportJSONFormat = R"({
+    "pid" : %d,
+    "exit" : {
+        "type" : "%s",
+        "code" : %d,
+        "desc" : "%s"
+    },
+    "time_ms" : {
+        "total" : %.3f,
+        "user"  : %.3f,
+        "sys"   : %.3f
+    }
+})";
 
 /**** helpers ****/
 
 /** helper: print help */
 static void printHelp() {
     fprintf(stdout, helpMessage,
-            kStatsFilenameEnvVar, kTimeoutEnvVar, kDefaultTimeoutMillisec);
+            kStatsFilenameEnvVar, kTimeoutEnvVar, kDefaultTimeoutSec);
+}
+
+static const char *exitTypeString(ChildExit_t exit_type) {
+    switch (exit_type) {
+    case kNormalExit: return "normal";
+    case kSignalExit: return "signaled";
+    case kOtherExit:  return "unknown";
+    case kTimeout:    return "timeout";
+    default:          return "?";
+    }
+}
+
+static const char *exitReprString(ChildExit_t exit_type, int exit_numeric_repr) {
+    switch (exit_type) {
+    case kNormalExit: return "exit code";
+    case kSignalExit: return strsignal(exit_numeric_repr);
+    case kOtherExit:  return "unknown";
+    case kTimeout:    return strsignal(exit_numeric_repr);
+    default:          return "?";
+    }
 }
 
 /** helper: check whether a null-terminated string is all digits */
@@ -98,7 +134,7 @@ struct WorkParams {
     /** argument count in command, including the program name */
     int argc;
     /** limit of runtime on processor */
-    int timeout_millisec;
+    unsigned timeout_sec;
     /** the inspected command: the program name, followed by
      * whatever args it has, then NULL (i.e. command[argc] == NULL) */
     char **command;
@@ -106,27 +142,72 @@ struct WorkParams {
     char *stats_filename;
 };
 
+void reportTimes(ChildExit_t exit_type,
+                 const WorkParams &params,
+                 pid_t pid,
+                 int exit_numeric_repr,
+                 const tms &tms_obj) {
+    /* milleseconds - to prevent overflow, devide first instead of multiply first */
+    double child_user_msec = -1, child_sys_msec = -1;
+    if (exit_type != kTimeout) {
+        child_user_msec  = 1000 * (1.0 * tms_obj.tms_cutime / CLOCKS_PER_SEC);
+        child_sys_msec   = 1000 * (1.0 * tms_obj.tms_cstime / CLOCKS_PER_SEC);
+    }
+    char buffer[512];
+    memset(buffer, 0, sizeof(buffer));
+    snprintf(buffer, sizeof(buffer), kReportJSONFormat,
+        pid,
+        exitTypeString(exit_type), exit_numeric_repr,
+        exitReprString(exit_type, exit_numeric_repr),
+        exit_type != kTimeout ? (child_user_msec + child_sys_msec) : 1000 * params.timeout_sec,
+        child_user_msec, child_sys_msec);
+    if (!params.stats_filename) {
+        fprintf(stderr, "%s\n", buffer);
+    } else {
+        FILE *stats_file = fopen(params.stats_filename, "w");
+        if (!stats_file) {
+            ERROR_FMT("error at openning file %s", params.stats_filename);
+            return;
+        }
+        fprintf(stats_file, "%s\n", buffer);
+    }
+}
+
 /** main works */
 int work(const WorkParams &params) {
     pid_t child_pid = -1;
-    CHECKED_SYSCALL(child_pid = fork(), "fork");
+    CHECKED_SYSCALL(child_pid = fork(), "fork", PARENT_ERR);
 
-    if (child_pid == 0) { /* child process */
-        rlimit rlimit_obj = { 2, 2 };
-        setrlimit(RLIMIT_CPU, &rlimit_obj);
-        CHECKED_SYSCALL(execvp(params.command[0], params.command), "exec");
-    } else { /* parent process */
+    if (child_pid == 0) {
+        /* child process */
+        rlimit rlimit_obj = { params.timeout_sec, params.timeout_sec };
+        CHECKED_SYSCALL(setrlimit(RLIMIT_CPU, &rlimit_obj), "setrlimit in child, abort", CHILD_ERR);
+        CHECKED_SYSCALL(execvp(params.command[0], params.command), "exec in child, abort", CHILD_ERR);
+    } else {
+        /* parent process */
         VERBOSE("child forked; pid %d", child_pid);
-        int child_status;
-        CHECKED_SYSCALL(waitpid(child_pid, &child_status, 0), "waitpid");
+        int child_status = 0;
+        tms tms_obj;
+        memset(&tms_obj, 0, sizeof(tms_obj));
+        /* user time, system time of parent and child */
+        CHECKED_SYSCALL(waitpid(child_pid, &child_status, 0), "waitpid", PARENT_ERR);
         if (WIFEXITED(child_status)) {
             int exit_status = WEXITSTATUS(child_status);
+            CHECKED_SYSCALL(times(&tms_obj), "times", PARENT_ERR);
+            reportTimes(kNormalExit, params, child_pid, exit_status, tms_obj);
             VERBOSE("child %d exited with %d", child_pid, exit_status);
         } else if (WIFSIGNALED(child_status)) {
             int sig = WTERMSIG(child_status);
-            const char *sig_name = strsignal(sig);
-            VERBOSE("child terminated by signal %d (%s)", sig, sig_name);
+            CHECKED_SYSCALL(times(&tms_obj), "times", PARENT_ERR);
+            if (sig == SIGXCPU || sig == SIGKILL /* Linux */) {
+                reportTimes(kTimeout, params, child_pid, sig, tms_obj);
+                VERBOSE("timeout, %d sec", params.timeout_sec);
+            } else {
+                reportTimes(kSignalExit, params, child_pid, sig, tms_obj);
+                VERBOSE("child terminated by signal %d (%s)", sig, strsignal(sig));
+            }
         } else {
+            reportTimes(kOtherExit, params, child_pid, -1, tms_obj);
             VERBOSE("child exited abnormally without signal, pid = %d", child_pid);
         }
     }
@@ -145,10 +226,10 @@ int main(int argc, char *argv[]) {
     params.stats_filename = getenv(kStatsFilenameEnvVar);
 
     /** time limit for the program */
-    params.timeout_millisec = kDefaultTimeoutMillisec;
+    params.timeout_sec = kDefaultTimeoutSec;
     char *timeout_env = getenv(kTimeoutEnvVar);
     if (timeout_env && isShortDigit(timeout_env, 5) && timeout_env[0] != '0') {
-        params.timeout_millisec = atoi(timeout_env);
+        params.timeout_sec = atoi(timeout_env);
     }
 
     int command_start = -1;
@@ -160,7 +241,7 @@ int main(int argc, char *argv[]) {
             } else if (matchFlag(argv[i], "-v", "--verbose")) {
                 g_verbose = true;
             } else {
-                ERROR_FMT("option '%s' not recognized, use '-h' for help", argv[1]);
+                ERROR_FMT("option '%s' not recognized, use '-h' for help", argv[i]);
                 return 1;
             }
         } else {
@@ -177,7 +258,7 @@ int main(int argc, char *argv[]) {
     params.command = argv + command_start;
 
     VERBOSE("stats output: %s", params.stats_filename ? params.stats_filename : "(stdout)");
-    VERBOSE("timeout:      %d", params.timeout_millisec);
+    VERBOSE("timeout:      %d", params.timeout_sec);
     VERBOSE("command:      %s", std::accumulate(params.command + 1, params.command + params.argc,
         std::string(params.command[0]), [](const std::string &acc, const char *part){
             return acc + " " + part;
