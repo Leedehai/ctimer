@@ -42,9 +42,11 @@ static bool g_verbose = false;
 #define CHILD_ERR  abort();
 
 enum ChildExit_t { kNormalExit, kSignalExit, kOtherExit, kTimeout };
+
 static const char *kStatsFilenameEnvVar = "CTIMER_STATS";
 static const char *kTimeoutEnvVar = "CTIMER_TIMEOUT";
 static const unsigned int kDefaultTimeoutSec = 2;
+
 static const char *helpMessage = R"(usage: ctimer [-h] [-v] program [args ...]
 
 ctimer: measure a program's processor time
@@ -84,6 +86,7 @@ static void printHelp() {
             kStatsFilenameEnvVar, kTimeoutEnvVar, kDefaultTimeoutSec);
 }
 
+/** helper: interpret exit type */
 static const char *exitTypeString(ChildExit_t exit_type) {
     switch (exit_type) {
     case kNormalExit: return "normal";
@@ -94,6 +97,7 @@ static const char *exitTypeString(ChildExit_t exit_type) {
     }
 }
 
+/** helper: return description of |exit_numeric_repr| */
 static const char *exitReprString(ChildExit_t exit_type, int exit_numeric_repr) {
     switch (exit_type) {
     case kNormalExit: return "exit code";
@@ -142,7 +146,8 @@ struct WorkParams {
     char *stats_filename;
 };
 
-void reportTimes(ChildExit_t exit_type,
+/** print stats; return 0 on success, 1 otherwise */
+int reportTimes(ChildExit_t exit_type,
                  const WorkParams &params,
                  pid_t pid,
                  int exit_numeric_repr,
@@ -153,27 +158,32 @@ void reportTimes(ChildExit_t exit_type,
         child_user_msec  = 1000 * (1.0 * tms_obj.tms_cutime / CLOCKS_PER_SEC);
         child_sys_msec   = 1000 * (1.0 * tms_obj.tms_cstime / CLOCKS_PER_SEC);
     }
+
     char buffer[512];
     memset(buffer, 0, sizeof(buffer));
-    snprintf(buffer, sizeof(buffer), kReportJSONFormat,
+    int snprintf_ret = snprintf(buffer, sizeof(buffer), kReportJSONFormat,
         pid,
         exitTypeString(exit_type), exit_numeric_repr,
         exitReprString(exit_type, exit_numeric_repr),
-        exit_type != kTimeout ? (child_user_msec + child_sys_msec) : 1000 * params.timeout_sec,
+        exit_type != kTimeout ? child_user_msec + child_sys_msec : 1000 * params.timeout_sec,
         child_user_msec, child_sys_msec);
+    if (snprintf_ret == -1) { return 1; }
+
+    int fprintf_ret;
     if (!params.stats_filename) {
-        fprintf(stderr, "%s\n", buffer);
+        fprintf_ret = fprintf(stderr, "%s\n", buffer);
     } else {
         FILE *stats_file = fopen(params.stats_filename, "w");
         if (!stats_file) {
             ERROR_FMT("error at openning file %s", params.stats_filename);
-            return;
+            return 1;
         }
-        fprintf(stats_file, "%s\n", buffer);
+        fprintf_ret = fprintf(stats_file, "%s\n", buffer);
     }
+    return fprintf_ret != -1 ? 0 : 1;
 }
 
-/** main works */
+/** main works; return 0 on success, 1 otherwise */
 int work(const WorkParams &params) {
     pid_t child_pid = -1;
     CHECKED_SYSCALL(child_pid = fork(), "fork", PARENT_ERR);
@@ -200,15 +210,15 @@ int work(const WorkParams &params) {
             int sig = WTERMSIG(child_status);
             CHECKED_SYSCALL(times(&tms_obj), "times", PARENT_ERR);
             if (sig == SIGXCPU || sig == SIGKILL /* Linux */) {
-                reportTimes(kTimeout, params, child_pid, sig, tms_obj);
                 VERBOSE("timeout, %d sec", params.timeout_sec);
+                return reportTimes(kTimeout, params, child_pid, sig, tms_obj);
             } else {
-                reportTimes(kSignalExit, params, child_pid, sig, tms_obj);
                 VERBOSE("child terminated by signal %d (%s)", sig, strsignal(sig));
+                return reportTimes(kSignalExit, params, child_pid, sig, tms_obj);
             }
         } else {
-            reportTimes(kOtherExit, params, child_pid, -1, tms_obj);
             VERBOSE("child exited abnormally without signal, pid = %d", child_pid);
+            return reportTimes(kOtherExit, params, child_pid, -1, tms_obj);
         }
     }
     return 0;

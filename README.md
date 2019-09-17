@@ -2,8 +2,9 @@
 
 Often times I find it frustrating that there is no simple, standalone program <u>**written in C/C++**</u> that
 can do the simple trick:
-- measures [processor time](https://en.wikipedia.org/wiki/CPU_time) of an arbitrary program running in a subprocess,
-- terminates the subprocess if it exceeds a predefined limit.
+- measures [processor time](https://en.wikipedia.org/wiki/CPU_time) of an arbitrary program in a subprocess,
+- terminates the subprocess if it exceeds a predefined limit,
+- report exit status and time measurements (milliseconds) in JSON format.
 
 So here you have it:)
 
@@ -23,7 +24,7 @@ make ctimer
 ## How to use
 - For help:
 ```
-$ ctimer --help
+$ ./ctimer --help
 usage: ctimer [-h] [-v] program [args ...]
 
 ctimer: measure a program's processor time
