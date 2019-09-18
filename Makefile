@@ -5,7 +5,7 @@
 # ---------------------------
 # The makefile.
 
-CC=clang++
+CC=g++ # on macOS it's actually clang++
 
 ctimer : ctimer.cc
 	$(CC) -std=c++14 -Wall -Wpedantic -DNDEBUG -O3 $^ -pthread -o $@
