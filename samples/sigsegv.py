@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# SIGSEGV typically raised by program itself
 
 import os, signal
 

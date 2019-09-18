@@ -2,8 +2,8 @@
 
 Often times I find it frustrating that there is no simple, standalone program <u>**written in C/C++**</u> that
 can do the simple trick:
-- measures [processor time](https://en.wikipedia.org/wiki/CPU_time) of an arbitrary program, including any descendant processes that program may spawn,
-- terminates the program if it exceeds a predefined limit,
+- measure [processor time](https://en.wikipedia.org/wiki/CPU_time) of an arbitrary program, including any descendant processes that program may spawn,
+- terminate the program if it exceeds a predefined limit,
 - report exit status and time measurements (msec) in JSON format.
 
 So here you have it:)
@@ -57,10 +57,14 @@ ctimer -v out/some_program --foo 42
 - Play:
 ```sh
 # try with the samples
-./ctimer samples/quick.py
-./ctimer samples/quick.py --print
-./ctimer samples/infinite.py
-./ctimer samples/sigsegv.py
+./ctimer samples/infinite.py      # timeout
+./ctimer samples/quick.py         # normal exit
+./ctimer samples/quick.py --print # normal exit
+./ctimer samples/sleep.py         # normal exit
+./ctimer samples/sigint.py        # normal exit: Python catches SIGINT
+./ctimer samples/sigkill.py       # killed by signal SIGKILL
+./ctimer samples/foo              # quit: file not found
+./ctimer samples/text.txt         # quit: permission doesn't allow execution
 
 # you can be playful
 ./ctimer -v ./ctimer -v ./ctimer -h
