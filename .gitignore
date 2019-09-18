@@ -4,3 +4,4 @@ ctimer
 .DS_Store
 *.o
 *.pyc
+*.log

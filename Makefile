@@ -5,10 +5,10 @@
 # ---------------------------
 # The makefile.
 
-CC=g++ # on macOS it's actually clang++
+CXX=g++ # on macOS it's actually clang++
 
 ctimer : ctimer.cc
-	$(CC) -std=c++14 -Wall -Wpedantic -DNDEBUG -O3 $^ -pthread -o $@
+	$(CXX) -std=c++14 -Wall -Wpedantic -DNDEBUG -O3 $^ -pthread -o $@
 
 clean :
 	rm -f ctimer

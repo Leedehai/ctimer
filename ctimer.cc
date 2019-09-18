@@ -45,10 +45,10 @@ static bool g_verbose = false;
 enum ChildExit_t { kNormal, kSignal, kQuit, kTimeout, kUnknown };
 
 static const char *kStatsFilenameEnvVar = "CTIMER_STATS";
-static const char *kTimeoutEnvVar = "CTIMER_TIMEOUT";
+static const char *kTimeoutEnvVar       = "CTIMER_TIMEOUT";
 static const unsigned int kDefaultTimeoutMillisec = 1500;
 
-static const char *helpMessage = R"(usage: ctimer [-h] [-v] program [args ...]
+static const char *kHelpMessage = R"(usage: ctimer [-h] [-v] program [args ...]
 
 ctimer: measure a program's processor time
 
@@ -69,7 +69,7 @@ static const char *kReportJSONFormat = R"({
     "pid" : %d,
     "exit" : {
         "type" : "%s",
-        "code" : %d,
+        "repr" : %s,
         "desc" : "%s"
     },
     "time_ms" : {
@@ -83,7 +83,7 @@ static const char *kReportJSONFormat = R"({
 
 /** helper: print help */
 static void printHelp() {
-    fprintf(stdout, helpMessage,
+    fprintf(stdout, kHelpMessage,
             kStatsFilenameEnvVar, kTimeoutEnvVar, kDefaultTimeoutMillisec);
 }
 
@@ -91,9 +91,9 @@ static void printHelp() {
 static const char *exitTypeString(ChildExit_t exit_type) {
     switch (exit_type) {
     case kNormal:  return "normal";
-    case kSignal:  return "internal signal";
-    case kQuit:    return "child quit";
-    case kTimeout: return "timeout signal";
+    case kSignal:  return "signal";
+    case kQuit:    return "quit";
+    case kTimeout: return "timeout";
     case kUnknown: return "unknown";
     default:       return "?";
     }
@@ -105,14 +105,14 @@ static const char *exitReprString(ChildExit_t exit_type, int exit_numeric_repr) 
     case kNormal:  return "exit code";
     case kSignal:  return strsignal(exit_numeric_repr);
     case kQuit:    return "child error before exec";
-    case kTimeout: return strsignal(exit_numeric_repr);
+    case kTimeout: return "child runtime limit (ms)";
     case kUnknown: return "unknown";
     default:       return "?";
     }
 }
 
 /** helper: check whether a null-terminated string is all digits */
-static bool isShortDigit(const char *s, int maxCount) {
+static bool isShortDigitStr(const char *s, int maxCount) {
     if (maxCount <= 0) { return false; }
     short int count = 0;
     while (*s) {
@@ -161,11 +161,17 @@ int reportTimes(ChildExit_t exit_type,
     double child_user_msec = tv2msec(rusage_obj.ru_utime);
     double child_sys_msec  = tv2msec(rusage_obj.ru_stime);
 
-    char buffer[512];
-    memset(buffer, 0, sizeof(buffer));
+    char exit_str_repr[16] = { 0 };
+    if (exit_numeric_repr >= 0) {
+        snprintf(exit_str_repr, sizeof(exit_str_repr), "%d", exit_numeric_repr);
+    } else {
+        snprintf(exit_str_repr, sizeof(exit_str_repr), "null");
+    }
+
+    char buffer[512] = { 0 };
     int snprintf_ret = snprintf(buffer, sizeof(buffer), kReportJSONFormat,
         pid,
-        exitTypeString(exit_type), exit_numeric_repr,
+        exitTypeString(exit_type), exit_str_repr,
         exitReprString(exit_type, exit_numeric_repr),
         child_user_msec + child_sys_msec,
         child_user_msec, child_sys_msec);
@@ -195,7 +201,6 @@ int work(const WorkParams &params) {
 
     if (child_pid == 0) {
         /* child process */
-        
         /* ITIMER_PROF: decrements when the process executes OR
          * when the system is executing on behalf of the process. */
         CHECKED_SYSCALL(setitimer(ITIMER_PROF, &interval, 0), "setitimer in child", CHILD_ERR);
@@ -204,21 +209,21 @@ int work(const WorkParams &params) {
         /* parent process */
         VERBOSE("child forked; pid %d", child_pid);
         int child_status = 0;
+        CHECKED_SYSCALL(waitpid(child_pid, &child_status, 0), "waitpid", PARENT_ERR);
+
         rusage rusage_obj;
         memset(&rusage_obj, 0, sizeof(rusage_obj));
-        /* user time, system time of parent and child */
-        CHECKED_SYSCALL(waitpid(child_pid, &child_status, 0), "waitpid", PARENT_ERR);
+        CHECKED_SYSCALL(getrusage(RUSAGE_CHILDREN, &rusage_obj), "getrusage", PARENT_ERR);
+
         if (WIFEXITED(child_status)) {
             int exit_status = WEXITSTATUS(child_status);
-            CHECKED_SYSCALL(getrusage(RUSAGE_CHILDREN, &rusage_obj), "getrusage", PARENT_ERR);
             VERBOSE("child %d exited with %d", child_pid, exit_status);
             return reportTimes(kNormal, params, child_pid, exit_status, rusage_obj);
         } else if (WIFSIGNALED(child_status)) {
             int sig = WTERMSIG(child_status);
-            CHECKED_SYSCALL(getrusage(RUSAGE_CHILDREN, &rusage_obj), "getrusage", PARENT_ERR);
             if (sig == SIGPROF) {
                 VERBOSE("child %d timeout, %d msec", child_pid, params.timeout_msec);
-                return reportTimes(kTimeout, params, child_pid, -1, rusage_obj);
+                return reportTimes(kTimeout, params, child_pid, params.timeout_msec, rusage_obj);
             } else if (sig == SIGQUIT) {
                 VERBOSE("child %d quit", child_pid);
                 return reportTimes(kQuit, params, child_pid, -1, rusage_obj);
@@ -227,7 +232,6 @@ int work(const WorkParams &params) {
                 return reportTimes(kSignal, params, child_pid, sig, rusage_obj);
             }
         } else {
-            CHECKED_SYSCALL(getrusage(RUSAGE_CHILDREN, &rusage_obj), "getrusage", PARENT_ERR);
             VERBOSE("child exited abnormally without signal, pid = %d", child_pid);
             return reportTimes(kUnknown, params, child_pid, -1, rusage_obj);
         }
@@ -248,9 +252,14 @@ int main(int argc, char *argv[]) {
 
     /** time limit for the program */
     params.timeout_msec = kDefaultTimeoutMillisec;
-    char *timeout_env = getenv(kTimeoutEnvVar);
-    if (timeout_env && isShortDigit(timeout_env, 5) && timeout_env[0] != '0') {
-        params.timeout_msec = atoi(timeout_env);
+    if (char *timeout_env = getenv(kTimeoutEnvVar)) {
+        if (timeout_env[0] != '0' && isShortDigitStr(timeout_env, 5)) {
+            params.timeout_msec = atoi(timeout_env);
+        } else {
+            ERROR_FMT("%s value '%s' is led by '0', not pure digits, or too long",
+                kTimeoutEnvVar, timeout_env);
+            return 1;
+        }
     }
 
     int command_start = -1;

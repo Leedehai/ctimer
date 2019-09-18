@@ -71,6 +71,17 @@ ctimer -v out/some_program --foo 42
 ```
 
 ## Result
+The output is in JSON format, and is a dictionary containing 3 keys:
+- `pid`: process ID of the inspected program,
+- `exit`: exit status of the inspected program, which is a dictionary:
+    - `type`: exit type
+    - `repr`: the numeric representation of the exit info, can be `null`
+    - `desc`: description of `repr`
+- `time_ms`: time measurements, which is a dictionary:
+    - `total`: processor time (milliseconds),
+    - `user`: processor time spent in user space
+    - `sys`: processor time spent in kernel space
+
 ```sh
 $ ./ctimer date
 Tue Sep 17 21:52:52 PDT 2019
@@ -78,7 +89,7 @@ Tue Sep 17 21:52:52 PDT 2019
     "pid" : 35871,
     "exit" : {
         "type" : "normal",
-        "code" : 0,
+        "repr" : 0,
         "desc" : "exit code"
     },
     "time_ms" : {
@@ -91,16 +102,16 @@ Tue Sep 17 21:52:52 PDT 2019
 ```sh
 $ CTIMER_STATS=res.txt ./ctimer samples/infinite.py && cat res.txt
 {
-    "pid" : 35981,
+    "pid" : 249775,
     "exit" : {
-        "type" : "timeout signal",
-        "code" : 27,
-        "desc" : "Profiling timer expired: 27"
+        "type" : "child timeout",
+        "repr" : 1500,
+        "desc" : "runtime limit (ms)"
     },
     "time_ms" : {
-        "total" : 2102.789,
-        "user"  : 2079.663,
-        "sys"   : 23.126
+        "total" : 1501.476,
+        "user"  : 1493.490,
+        "sys"   : 7.986
     }
 }
 ```
