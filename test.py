@@ -18,7 +18,7 @@ TESTS = [
 STATS_FILENAME = "stats.log"
 def run_one(test_item):
     with open(os.devnull, 'w') as devnull: # Python2 doesn't have subprocess.DEVNULL
-        exit_code = subprocess.Popen(["./ctimer", test_item["file"]],
+        exit_code = subprocess.Popen(' '.join(["./ctimer", test_item["file"]]), shell=True,
             env={ "CTIMER_STATS": STATS_FILENAME },
             stdout=devnull, stderr=subprocess.STDOUT).wait()
         if exit_code != 0:
@@ -30,30 +30,33 @@ def run_one(test_item):
     with open(STATS_FILENAME, 'r') as res_file:
         res_dict = json.load(res_file)
         os.remove(STATS_FILENAME)
-        missing_fields = False
         def _has_primary_field(key):
             if key not in res_dict:
-                missing_fields = True
                 print("%s: result missing field '%s'" % (
                     test_item["file"], key))
                 return False
             return True
-        def _has_secondary_field(primary, key):
+        def _has_secondary_field(primary, key, obj_type, nullable=False):
             if key not in res_dict[primary]:
-                missing_fields = True
                 print("%s: result missing field '%s' in '%s'" % (
                     test_item["file"], key, primary))
                 return False
+            if obj_type != None and type(res_dict[primary][key]) != obj_type:
+                if (not nullable) or (res_dict[primary][key] != None):
+                    print("%s: result field '%s' in '%s' expects to be of type '%s'%s, but is '%s'" % (
+                        test_item["file"], key, primary,
+                        obj_type, "or NoneType" if nullable else "", type(res_dict[primary][key])))
+                    return False
             return True
         if not (_has_primary_field("pid")
             and _has_primary_field("exit")
-            and _has_secondary_field("exit", "type")
-            and _has_secondary_field("exit", "repr")
-            and _has_secondary_field("exit", "desc")
+            and _has_secondary_field("exit", "type", obj_type=None) # obj_type: Python2: 'unicode', Python3: 'str' - nasty!
+            and _has_secondary_field("exit", "repr", int, True)
+            and _has_secondary_field("exit", "desc", obj_type=None) # see above
             and _has_primary_field("time_ms")
-            and _has_secondary_field("time_ms", "total")
-            and _has_secondary_field("time_ms", "user")
-            and _has_secondary_field("time_ms", "sys")):
+            and _has_secondary_field("time_ms", "total", float)
+            and _has_secondary_field("time_ms", "user", float)
+            and _has_secondary_field("time_ms", "sys", float)):
             return False
         if len(res_dict) != 3:
             print("%s: result expects 3 fields, %d found" % (
@@ -89,9 +92,9 @@ def main():
             error_count += 1
             print("\x1b[31m[Error] %s\x1b[0m" % test_item["file"])
     if error_count:
-        print("\x1b[31merror count: %d out of %d tests" % (error_count, len(TESTS)))
+        print("error count: %d out of %d tests" % (error_count, len(TESTS)))
     else:
-        print("\x1b[32mall is fine")
+        print("all is fine")
     return 0 if error_count == 0 else 1
 
 if __name__ == "__main__":

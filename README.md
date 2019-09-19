@@ -14,11 +14,16 @@ So here you have it:)
 - OS: Linux (kernel 2.6+) or macOS 10.12+ (no Windows, because POSIX is needed)
 - build tool: GNU Make 3.81+
 - compiler: Clang (GCC is not tested but should work) with C++14 standard
-- run samples: Python2 or Python3
+- run tests and samples: Python2 or Python3
 
 ## How to build
 ```sh
 make ctimer
+```
+
+## How to test
+```sh
+./test.py
 ```
 
 ## How to use
@@ -51,7 +56,7 @@ optional environment vairables:
 CTIMER_TIMEOUT=5000 CTIMER_STATS=res.txt ./ctimer out/some_program --foo 42
 
 # (dev) enable verbose printout
-ctimer -v out/some_program --foo 42
+./ctimer -v out/some_program --foo 42
 ```
 
 - Play:
@@ -104,9 +109,9 @@ $ CTIMER_STATS=res.txt ./ctimer samples/infinite.py && cat res.txt
 {
     "pid" : 249775,
     "exit" : {
-        "type" : "child timeout",
+        "type" : "timeout",
         "repr" : 1500,
-        "desc" : "runtime limit (ms)"
+        "desc" : "child runtime limit (ms)"
     },
     "time_ms" : {
         "total" : 1501.476,
