@@ -47,6 +47,8 @@ optional environment vairables:
     CTIMER_TIMEOUT   processor time limit (ms), default: 1500
 ```
 
+> Q: why use environment variables to pass in custom output filename and timeout value?<br>A: I do not want to handle ambiguous cases of missing argument, and setting these is a rare need.<br>For example, `./ctimer --file foo` could be interpreted as "missing argument for option '--file'" or as "missing program name"; `./ctimer --file foo bar` could be interpreted as "missing argument for option '--file' while executing program 'foo' with argument 'bar'" or as "execute program 'bar' and write outputs to 'foo'".<br>This ambiguity could be resolved by introducing double-dash `--` to denote the start of program name, but this is less elegant: `./ctimer -- foo` is ugly. Moreover, I dislike how [GDB](https://www.gnu.org/software/gdb/) handles this ambiguity.<br>Also, name collision should be unlikely because these variable names have prefix `CTIMER_`.
+
 - Examples:
 ```sh
 # default configs: output = (stdout), timeout = 1500 ms
@@ -69,7 +71,7 @@ CTIMER_TIMEOUT=5000 CTIMER_STATS=res.txt ./ctimer out/some_program --foo 42
 ./ctimer samples/sigint.py        # normal exit: Python catches SIGINT
 ./ctimer samples/sigkill.py       # killed by signal SIGKILL
 ./ctimer samples/foo              # quit: file not found
-./ctimer samples/text.txt         # quit: permission doesn't allow execution
+./ctimer samples/text.txt         # quit: lack execution privilege
 
 # you can be playful
 ./ctimer -v ./ctimer -v ./ctimer -h
