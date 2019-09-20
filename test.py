@@ -53,10 +53,10 @@ def run_one(test_item):
             and _has_secondary_field("exit", "type", obj_type=None) # obj_type: Python2: 'unicode', Python3: 'str' - nasty!
             and _has_secondary_field("exit", "repr", int, True)
             and _has_secondary_field("exit", "desc", obj_type=None) # see above
-            and _has_primary_field("time_ms")
-            and _has_secondary_field("time_ms", "total", float)
-            and _has_secondary_field("time_ms", "user", float)
-            and _has_secondary_field("time_ms", "sys", float)):
+            and _has_primary_field("times_ms")
+            and _has_secondary_field("times_ms", "total", float)
+            and _has_secondary_field("times_ms", "user", float)
+            and _has_secondary_field("times_ms", "sys", float)):
             return False
         if len(res_dict) != 3:
             print("%s: result expects 3 fields, %d found" % (
@@ -67,22 +67,22 @@ def run_one(test_item):
                 test_item["file"], len(res_dict["exit"])))
             return False
         if len(res_dict) != 3:
-            print("%s: result['time_ms'] expects 3 fields, %d found" % (
-                test_item["file"], len(res_dict["time_ms"])))
+            print("%s: result['times_ms'] expects 3 fields, %d found" % (
+                test_item["file"], len(res_dict["times_ms"])))
             return False
         if res_dict["exit"]["type"] != test_item["child_exit"]:
             print("%s: exit type expects '%s', but is '%s'" % (
                 test_item["file"], test_item["child_exit"], res_dict["exit"]["type"]))
             return False
-        if test_item["time"](res_dict["time_ms"]["total"]) == False:
+        if test_item["time"](res_dict["times_ms"]["total"]) == False:
             print("%s: total time %d not in expected range" % (
-                test_item["file"], test_item["time_ms"]["total"]))
+                test_item["file"], test_item["times_ms"]["total"]))
             return False
     return True
 
 def main():
     if not os.path.isfile("ctimer"):
-        print("[Error] no executable 'ctimer' found")
+        print("[Error] no executable 'ctimer' found; did you build ctimer?")
         return 1
     error_count = 0
     for test_item in TESTS:

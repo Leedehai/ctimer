@@ -74,7 +74,7 @@ static const char *kReportJSONFormat = R"(%s{
         "repr" : %s,
         "desc" : "%s"
     },
-    "time_ms" : {
+    "times_ms" : {
         "total" : %.3f,
         "user"  : %.3f,
         "sys"   : %.3f
@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
 
     /* delimiter that encompasses the stats report */
     params.delimiter = getenv(kDelimiterEnvVar);
-    if (strlen(params.delimiter) >= 20) {
+    if (params.delimiter && strlen(params.delimiter) >= 20) {
         ERROR_FMT("delimiter string is too long (>=20): %s", params.delimiter);
         return 1;
     }
