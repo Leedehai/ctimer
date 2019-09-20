@@ -46,6 +46,7 @@ enum ChildExit_t { kNormal, kSignal, kQuit, kTimeout, kUnknown };
 
 static const char *kStatsFilenameEnvVar = "CTIMER_STATS";
 static const char *kTimeoutEnvVar       = "CTIMER_TIMEOUT";
+static const char *kDelimiterEnvVar     = "CTIMER_DELIMITER";
 static const unsigned int kDefaultTimeoutMillisec = 1500;
 
 static const char *kHelpMessage = R"(usage: ctimer [-h] [-v] program [args ...]
@@ -61,11 +62,12 @@ optional arguments:
     -v, --verbose    (dev) print verbosely
 
 optional environment vairables:
-    %-15s  file to write stats, default: (stdout)
-    %-15s  processor time limit (ms), default: %d
+    %-16s  file to write stats in JSON, default: (stdout)
+    %-16s  processor time limit (ms), default: %d
+    %-16s  delimiter encompassing the stats string
 )";
 
-static const char *kReportJSONFormat = R"({
+static const char *kReportJSONFormat = R"(%s{
     "pid" : %d,
     "exit" : {
         "type" : "%s",
@@ -77,14 +79,16 @@ static const char *kReportJSONFormat = R"({
         "user"  : %.3f,
         "sys"   : %.3f
     }
-})";
+}%s)";
 
 /**** helpers ****/
 
 /** helper: print help */
 static void printHelp() {
     fprintf(stdout, kHelpMessage,
-            kStatsFilenameEnvVar, kTimeoutEnvVar, kDefaultTimeoutMillisec);
+            kStatsFilenameEnvVar,
+            kTimeoutEnvVar, kDefaultTimeoutMillisec,
+            kDelimiterEnvVar);
 }
 
 /** helper: interpret exit type */
@@ -147,6 +151,8 @@ struct WorkParams {
     char **command;
     /** the file to write stats; write to stdout if NULL */
     char *stats_filename;
+    /** delimiter that encompasses the stats string */
+    char *delimiter;
 };
 
 /** print stats; return 0 on success, 1 otherwise */
@@ -170,11 +176,13 @@ int reportTimes(ChildExit_t exit_type,
 
     char buffer[512] = { 0 };
     int snprintf_ret = snprintf(buffer, sizeof(buffer), kReportJSONFormat,
+        params.delimiter ? params.delimiter : "",
         pid,
         exitTypeString(exit_type), exit_str_repr,
         exitReprString(exit_type, exit_numeric_repr),
         child_user_msec + child_sys_msec,
-        child_user_msec, child_sys_msec);
+        child_user_msec, child_sys_msec,
+        params.delimiter ? params.delimiter : "");
     if (snprintf_ret == -1) { return 1; }
 
     int fprintf_ret;
@@ -260,6 +268,13 @@ int main(int argc, char *argv[]) {
                 kTimeoutEnvVar, timeout_env);
             return 1;
         }
+    }
+
+    /* delimiter that encompasses the stats report */
+    params.delimiter = getenv(kDelimiterEnvVar);
+    if (strlen(params.delimiter) >= 20) {
+        ERROR_FMT("delimiter string is too long (>=20): %s", params.delimiter);
+        return 1;
     }
 
     int command_start = -1;

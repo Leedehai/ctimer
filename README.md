@@ -43,11 +43,10 @@ optional arguments:
     -v, --verbose    (dev) print verbosely
 
 optional environment vairables:
-    CTIMER_STATS     file to write stats, default: (stdout)
-    CTIMER_TIMEOUT   processor time limit (ms), default: 1500
+    CTIMER_STATS      file to write stats in JSON, default: (stdout)
+    CTIMER_TIMEOUT    processor time limit (ms), default: 1500
+    CTIMER_DELIMITER  delimiter encompassing the stats string
 ```
-
-> Q: why use environment variables to pass in custom output filename and timeout value?<br>A: I do not want to handle ambiguous cases of missing argument, and setting these is a rare need.<br>For example, `./ctimer --file foo` could be interpreted as "missing argument for option '--file'" or as "missing program name"; `./ctimer --file foo bar` could be interpreted as "missing argument for option '--file' while executing program 'foo' with argument 'bar'" or as "execute program 'bar' and write outputs to 'foo'".<br>This ambiguity could be resolved by introducing double-dash `--` to denote the start of program name, but this is less elegant: `./ctimer -- foo` is ugly. Moreover, I dislike how [GDB](https://www.gnu.org/software/gdb/) handles this ambiguity.<br>Also, name collision should be unlikely because these variable names have prefix `CTIMER_`.
 
 - Examples:
 ```sh
@@ -122,6 +121,42 @@ $ CTIMER_STATS=res.txt ./ctimer samples/infinite.py && cat res.txt
     }
 }
 ```
+
+## Some design decisions
+
+**Why use environment variables to pass in custom output filename and timeout value?**
+
+I do not want to handle ambiguous cases of missing argument, and setting these is a rare need.
+
+For example, `./ctimer --file foo` could be interpreted as "missing argument for option '--file'" or as "missing program name"; `./ctimer --file foo bar` could be interpreted as "missing argument for option '--file' while executing program 'foo' with argument 'bar'" or as "execute program 'bar' and write outputs to 'foo'".
+
+This ambiguity could be resolved by introducing double-dash `--` to denote the start of program name, but this is less elegant: `./ctimer -- foo` is ugly. Moreover, I dislike how [GDB](https://www.gnu.org/software/gdb/) handles this ambiguity.<br>Also, name collision should be unlikely because these variable names have prefix `CTIMER_`.
+
+**What's the point of CTIMER_DELIMITER?**
+
+If the inspected program itself has stdout outputs, it may pose a problem for users to extract the stats report from the stdout. In this case, the user can use `CTIMER_DELIMITER` to specify a pattern to denote the beginning and the end of the stats report.
+
+Original:
+```sh
+$ ./ctimer inspected_program
+abc def {} {}
+{ some printout }
+{
+    # ... stats report
+}
+```
+
+With `CTIMER_DELIMITER`:
+```sh
+$ CTIMER_DELIMITER=::::::::: ./ctimer inspected_program
+abc def {} {}
+{ some printout }
+:::::::::{
+    # ... stats report
+}:::::::::
+```
+
+Admittedly, to tackle the said problem, a user could also use `CTIMER_STATS` to direct the stats report to a file, but disk IO is slow in a high concurrency use case unless the OS has an in-memory filesystem.
 
 ##### License
 [MIT License](LICENSE.txt)
