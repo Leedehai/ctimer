@@ -1,5 +1,7 @@
 # ctimer
 
+[![Build Status](https://travis-ci.com/Leedehai/ctimer.svg?branch=master)](https://travis-ci.com/Leedehai/ctimer)
+
 Often times I find it frustrating that there is no simple, standalone program <u>**written in C/C++**</u> that
 can do the simple tricks:
 - measure [processor time](https://en.wikipedia.org/wiki/CPU_time) of an arbitrary program, including any descendant processes that program may spawn,
@@ -23,7 +25,7 @@ make ctimer
 
 ## How to test
 ```sh
-./test.py
+./test.py # or: make check
 ```
 
 ## How to use
