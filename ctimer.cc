@@ -47,6 +47,7 @@ enum ChildExit_t { kNormal, kSignal, kQuit, kTimeout, kUnknown };
 static const char *kStatsFilenameEnvVar = "CTIMER_STATS";
 static const char *kTimeoutEnvVar       = "CTIMER_TIMEOUT";
 static const char *kDelimiterEnvVar     = "CTIMER_DELIMITER";
+static const unsigned int kEffectiveInfiniteTime = ~(1 << 31); /* in msec, over 24 days */
 static const unsigned int kDefaultTimeoutMillisec = 1500;
 
 static const char *kHelpMessage = R"(usage: ctimer [-h] [-v] program [args ...]
@@ -261,7 +262,9 @@ int main(int argc, char *argv[]) {
     /** time limit for the program */
     params.timeout_msec = kDefaultTimeoutMillisec;
     if (char *timeout_env = getenv(kTimeoutEnvVar)) {
-        if (timeout_env[0] != '0' && isShortDigitStr(timeout_env, 5)) {
+        if (timeout_env[0] == '0' && timeout_env[1] == '\0') {
+            params.timeout_msec = kEffectiveInfiniteTime;
+        } else if (timeout_env[0] != '0' && isShortDigitStr(timeout_env, 5)) {
             params.timeout_msec = atoi(timeout_env);
         } else {
             ERROR_FMT("%s value '%s' is led by '0', not pure digits, or too long",
@@ -303,7 +306,7 @@ int main(int argc, char *argv[]) {
     params.command = argv + command_start;
 
     VERBOSE("stats output: %s", params.stats_filename ? params.stats_filename : "(stdout)");
-    VERBOSE("timeout (ms): %d", params.timeout_msec);
+    VERBOSE("timeout (ms): %d%s", params.timeout_msec, params.timeout_msec == kEffectiveInfiniteTime ? " (infinite)" : "");
     VERBOSE("command:      %s", std::accumulate(params.command + 1, params.command + params.argc,
         std::string(params.command[0]), [](const std::string &acc, const char *part){
             return acc + " " + part;

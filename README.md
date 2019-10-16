@@ -50,6 +50,8 @@ optional environment vairables:
     CTIMER_DELIMITER  delimiter encompassing the stats string
 ```
 
+> To pose no time limit (effectively), use `CTIMER_TIMEOUT=0`.
+
 - Examples:
 ```sh
 # default configs: output = (stdout), timeout = 1500 ms
