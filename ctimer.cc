@@ -47,7 +47,9 @@ enum ChildExit_t { kNormal, kSignal, kQuit, kTimeout, kUnknown };
 static const char *kStatsFilenameEnvVar = "CTIMER_STATS";
 static const char *kTimeoutEnvVar       = "CTIMER_TIMEOUT";
 static const char *kDelimiterEnvVar     = "CTIMER_DELIMITER";
-static const unsigned int kEffectiveInfiniteTime = ~(1 << 31); /* in msec, over 24 days */
+/* NOTE do not make kEffectiveInfiniteTime a wider integer type, as Linux's
+ *      itimerval struct only accepts 32-bit or narrower integers */
+static const unsigned int kEffectiveInfiniteTime = 0x7FFFFFFF; /* in msec, over 24 days */
 static const unsigned int kDefaultTimeoutMillisec = 1500;
 
 static const char *kHelpMessage = R"(usage: ctimer [-h] [-v] program [args ...]
