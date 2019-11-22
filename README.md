@@ -10,7 +10,7 @@ can do the simple tricks:
 
 So here you have it:)
 
-> Motivation:<br>I need a timer to [run tests for my projects](https://github.com/Leedehai/runtest). I want to run them in parallel, so it is crucial to measure the processor time, i.e. time truly spent on execution, instead of the wall time.<br>I rolled one myself in Python, which works fine, but I was not satisfied with the speed, and more importantly the need of accomodating both Python2 and Python3 (since not everyone uses Python3), and for Python2 I had to write a non-daemonic process class, together with a number of other aerobatics.
+> Motivation:<br>I need a timer to [run tests for my projects](https://github.com/Leedehai/score). I want to run them in parallel, so it is crucial to measure the processor time, i.e. time truly spent on execution, instead of the wall time.<br>I rolled one myself in Python, which works fine, but I was not satisfied with the speed, and more importantly the need of accomodating both Python2 and Python3 (since not everyone uses Python3), and for Python2 I had to write a non-daemonic process class, together with a number of other aerobatics.
 
 ## Prerequisites
 - OS: Linux (kernel 2.6+) or macOS 10.12+ (no Windows, because POSIX is needed)
