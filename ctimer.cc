@@ -42,7 +42,7 @@ static bool g_verbose = false;
 #define PARENT_ERR return 1;
 #define CHILD_ERR  raise(SIGQUIT);
 
-enum ChildExit_t { kNormal, kSignal, kQuit, kTimeout, kUnknown };
+enum ChildExit_t { kReturn, kSignal, kQuit, kTimeout, kUnknown };
 
 static const char *kStatsFilenameEnvVar = "CTIMER_STATS";
 static const char *kTimeoutEnvVar       = "CTIMER_TIMEOUT";
@@ -97,7 +97,7 @@ static void printHelp() {
 /** helper: interpret exit type */
 static const char *exitTypeString(ChildExit_t exit_type) {
     switch (exit_type) {
-    case kNormal:  return "normal";
+    case kReturn:  return "return";
     case kSignal:  return "signal";
     case kQuit:    return "quit";
     case kTimeout: return "timeout";
@@ -109,7 +109,7 @@ static const char *exitTypeString(ChildExit_t exit_type) {
 /** helper: return description of |exit_numeric_repr| */
 static const char *exitReprString(ChildExit_t exit_type, int exit_numeric_repr) {
     switch (exit_type) {
-    case kNormal:  return "exit code";
+    case kReturn:  return "exit code";
     case kSignal:  return strsignal(exit_numeric_repr);
     case kQuit:    return "child error before exec";
     case kTimeout: return "child runtime limit (ms)";
@@ -229,7 +229,7 @@ int work(const WorkParams &params) {
         if (WIFEXITED(child_status)) {
             int exit_status = WEXITSTATUS(child_status);
             VERBOSE("child %d exited with %d", child_pid, exit_status);
-            return reportTimes(kNormal, params, child_pid, exit_status, rusage_obj);
+            return reportTimes(kReturn, params, child_pid, exit_status, rusage_obj);
         } else if (WIFSIGNALED(child_status)) {
             int sig = WTERMSIG(child_status);
             if (sig == SIGPROF) {

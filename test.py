@@ -7,10 +7,10 @@ import json
 
 TESTS = [
     { "file": "samples/infinite.py", "child_exit": "timeout", "time": lambda t : t > 1000 },
-    { "file": "samples/quick.py",    "child_exit": "normal",  "time": lambda t : t < 500 },
-    { "file": "samples/sigint.py",   "child_exit": "normal",  "time": lambda t : t < 500 },
+    { "file": "samples/quick.py",    "child_exit": "return",  "time": lambda t : t < 500 },
+    { "file": "samples/sigint.py",   "child_exit": "return",  "time": lambda t : t < 500 },
     { "file": "samples/sigkill.py",  "child_exit": "signal",  "time": lambda t : t < 500 },
-    { "file": "samples/sleep.py",    "child_exit": "normal",  "time": lambda t : t < 500 },
+    { "file": "samples/sleep.py",    "child_exit": "return",  "time": lambda t : t < 500 },
     { "file": "samples/foo",         "child_exit": "quit",    "time": lambda t : t < 50 },
     { "file": "samples/text.txt",    "child_exit": "quit",    "time": lambda t : t < 50 },
 ]

@@ -68,10 +68,10 @@ CTIMER_TIMEOUT=5000 CTIMER_STATS=res.txt ./ctimer out/some_program --foo 42
 ```sh
 # try with the samples
 ./ctimer samples/infinite.py      # timeout
-./ctimer samples/quick.py         # normal exit
-./ctimer samples/quick.py --print # normal exit
-./ctimer samples/sleep.py         # normal exit
-./ctimer samples/sigint.py        # normal exit: Python catches SIGINT
+./ctimer samples/quick.py         # return 0
+./ctimer samples/quick.py --print # return 0
+./ctimer samples/sleep.py         # return 0
+./ctimer samples/sigint.py        # return 0: Python catches SIGINT
 ./ctimer samples/sigkill.py       # killed by signal SIGKILL
 ./ctimer samples/foo              # quit: file not found
 ./ctimer samples/text.txt         # quit: lack execution privilege
@@ -98,7 +98,7 @@ Tue Sep 17 21:52:52 PDT 2019
 {
     "pid" : 35871,
     "exit" : {
-        "type" : "normal",
+        "type" : "return",
         "repr" : 0,
         "desc" : "exit code"
     },
