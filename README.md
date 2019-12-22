@@ -10,13 +10,13 @@ can do the simple tricks:
 
 So here you have it:)
 
-> Motivation:<br>I need a timer to [run tests for my projects](https://github.com/Leedehai/score). I want to run them in parallel, so it is crucial to measure the processor time, i.e. time truly spent on execution, instead of the wall time.<br>I rolled one myself in Python, which works fine, but I was not satisfied with the speed, and more importantly the need of accomodating both Python2 and Python3 (since not everyone uses Python3), and for Python2 I had to write a non-daemonic process class, together with a number of other aerobatics.
+> Motivation:<br>I needed a timer to [run tests](https://github.com/Leedehai/score). I want to run them in parallel, so it is crucial to measure the processor time, i.e. time truly spent on execution, instead of the wall time.<br>I rolled one myself in Python, which works fine, but I was not satisfied with the speed, and more importantly the need of accomodating both Python2 and Python3 (since not everyone uses Python3), and for Python2 I had to write a non-daemonic process class, together with a number of other aerobatics.
 
 ## Prerequisites
 - OS: Linux (kernel 2.6+) or macOS 10.12+ (no Windows, because POSIX is needed)
 - build tool: GNU Make 3.81+
 - compiler: Clang (GCC is not tested but should work) with C++14 standard
-- run tests and samples: Python2 or Python3
+- run tests and samples: Python3.5+
 
 ## How to build
 ```sh
@@ -132,7 +132,7 @@ $ CTIMER_STATS=res.txt ./ctimer samples/infinite.py && cat res.txt
 
 I do not want to handle ambiguous cases of missing argument, and setting these is a rare need.
 
-For example, `./ctimer --file foo` could be interpreted as "missing argument for option '--file'" or as "missing program name"; `./ctimer --file foo bar` could be interpreted as "missing argument for option '--file' while executing program 'foo' with argument 'bar'" or as "execute program 'bar' and write outputs to 'foo'".
+For example, `./ctimer --xyz foo` could be interpreted as "missing argument for option '--xyz'" or as "missing program name"; `./ctimer --xyz foo bar` could be interpreted as "missing argument for option '--xyz' while executing program 'foo' with argument 'bar'" or as "use argument `--xyz foo` and execute program 'bar'".
 
 This ambiguity could be resolved by introducing double-dash `--` to denote the start of program name, but this is less elegant: `./ctimer -- foo` is ugly. Moreover, I dislike how [GDB](https://www.gnu.org/software/gdb/) handles this ambiguity.<br>Also, name collision should be unlikely because these variable names have prefix `CTIMER_`.
 
@@ -160,7 +160,7 @@ abc def {} {}
 }:::::::::
 ```
 
-Admittedly, to tackle the said problem, a user could also use `CTIMER_STATS` to direct the stats report to a file, but disk IO is slow in a high concurrency use case unless the OS has an in-memory filesystem.
+Admittedly, to tackle the said problem, a user could also use `CTIMER_STATS` to direct the stats report to a file, but disk IO is slow in a high concurrency use case unless the OS has an in-memory filesystem. Opening a pipe is fine, too, but it adds extra work to consumers.
 
 ##### License
 [MIT License](LICENSE.txt)

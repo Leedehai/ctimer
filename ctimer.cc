@@ -214,6 +214,8 @@ int work(const WorkParams &params) {
         /* child process */
         /* ITIMER_PROF: decrements when the process executes OR
          * when the system is executing on behalf of the process. */
+        /* POSIX call execvp() takes the environment variables from the
+         * parent process */
         CHECKED_SYSCALL(setitimer(ITIMER_PROF, &interval, 0), "setitimer in child", CHILD_ERR);
         CHECKED_SYSCALL(execvp(params.command[0], params.command), "exec in child", CHILD_ERR);
     } else {
