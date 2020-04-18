@@ -1,0 +1,10 @@
+# The coding style for automatic reformatting using YAPF for Python.
+# Documentation on options:
+#   https://github.com/google/yapf#knobs
+# Inspect the configs:
+#   yapf --style-help | grep ...
+[style]
+based_on_style: chromium
+
+# Unlike Chromium, we use indentation width = 4.
+indent_width: 4

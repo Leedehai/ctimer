@@ -1,0 +1,7 @@
+---
+# The coding style for automatic reformatting using clang-format.
+# Documentation on options:
+#   http://clang.llvm.org/docs/ClangFormatStyleOptions.html
+# Inspect the configs:
+#   clang-format --dump-config | grep ...
+BasedOnStyle: Chromium
