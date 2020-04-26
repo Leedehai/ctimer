@@ -40,7 +40,7 @@ static bool g_verbose = false;
 #define PARENT_ERR return 1;
 #define CHILD_ERR raise(SIGQUIT);
 
-enum ChildExit_t { kReturn, kSignal, kQuit, kTimeout, kUnknown };
+enum ChildExit { kReturn, kSignal, kQuit, kTimeout, kUnknown };
 
 static const char* kStatsFilenameEnvVar = "CTIMER_STATS";
 static const char* kTimeoutEnvVar = "CTIMER_TIMEOUT";
@@ -84,13 +84,13 @@ static const char* kReportJSONFormat = R"(%s{
 }%s)";
 
 /** helper: print help */
-static void printHelp() {
+static void PrintHelp() {
   fprintf(stdout, kHelpMessage, kStatsFilenameEnvVar, kTimeoutEnvVar,
           kDefaultTimeoutMillisec, kDelimiterEnvVar);
 }
 
 /** helper: interpret exit type */
-static const char* exitTypeString(ChildExit_t exit_type) {
+static const char* GetExitTypeString(ChildExit exit_type) {
   switch (exit_type) {
     case kReturn:
       return "return";
@@ -108,8 +108,8 @@ static const char* exitTypeString(ChildExit_t exit_type) {
 }
 
 /** helper: return description of |exit_numeric_repr| */
-static const char* exitReprString(ChildExit_t exit_type,
-                                  int exit_numeric_repr) {
+static const char* GetExitReprString(ChildExit exit_type,
+                                     int exit_numeric_repr) {
   switch (exit_type) {
     case kReturn:
       return "exit code";
@@ -127,7 +127,7 @@ static const char* exitReprString(ChildExit_t exit_type,
 }
 
 /** helper: check whether a null-terminated string is all digits */
-static bool isShortDigitStr(const char* s, int maxCount) {
+static bool IsShortDigitStr(const char* s, int maxCount) {
   if (maxCount <= 0) {
     return false;
   }
@@ -144,7 +144,7 @@ static bool isShortDigitStr(const char* s, int maxCount) {
 }
 
 /** helper: compare flag string */
-static bool matchFlag(const char* in,
+static bool MatchFlag(const char* in,
                       const char* short_flag,
                       const char* long_flag) {
   if (!in) {
@@ -173,7 +173,7 @@ struct WorkParams {
 };
 
 /** print stats; return 0 on success, 1 otherwise */
-int reportTimes(ChildExit_t exit_type,
+int ReportTimes(ChildExit exit_type,
                 const WorkParams& params,
                 pid_t pid,
                 int exit_numeric_repr,
@@ -192,12 +192,13 @@ int reportTimes(ChildExit_t exit_type,
   }
 
   char buffer[512] = {0};
-  int snprintf_ret = snprintf(
-      buffer, sizeof(buffer), kReportJSONFormat,
-      params.delimiter ? params.delimiter : "", pid, exitTypeString(exit_type),
-      exit_str_repr, exitReprString(exit_type, exit_numeric_repr),
-      child_user_msec + child_sys_msec, child_user_msec, child_sys_msec,
-      params.delimiter ? params.delimiter : "");
+  int snprintf_ret =
+      snprintf(buffer, sizeof(buffer), kReportJSONFormat,
+               params.delimiter ? params.delimiter : "", pid,
+               GetExitTypeString(exit_type), exit_str_repr,
+               GetExitReprString(exit_type, exit_numeric_repr),
+               child_user_msec + child_sys_msec, child_user_msec,
+               child_sys_msec, params.delimiter ? params.delimiter : "");
   if (snprintf_ret == -1) {
     return 1;
   }
@@ -217,7 +218,7 @@ int reportTimes(ChildExit_t exit_type,
 }
 
 /** main works; return 0 on success, 1 otherwise */
-int work(const WorkParams& params) {
+int Work(const WorkParams& params) {
   int t_sec = params.timeout_msec / 1000,
       t_usec = 1000 * (params.timeout_msec % 1000);
   itimerval interval = {/* to */ {0, 0}, /* from */ {t_sec, t_usec}};
@@ -250,24 +251,24 @@ int work(const WorkParams& params) {
     if (WIFEXITED(child_status)) {
       int exit_status = WEXITSTATUS(child_status);
       VERBOSE("child %d exited with %d", child_pid, exit_status);
-      return reportTimes(kReturn, params, child_pid, exit_status, rusage_obj);
+      return ReportTimes(kReturn, params, child_pid, exit_status, rusage_obj);
     } else if (WIFSIGNALED(child_status)) {
       int sig = WTERMSIG(child_status);
       if (sig == SIGPROF) {
         VERBOSE("child %d timeout, %d msec", child_pid, params.timeout_msec);
-        return reportTimes(kTimeout, params, child_pid, params.timeout_msec,
+        return ReportTimes(kTimeout, params, child_pid, params.timeout_msec,
                            rusage_obj);
       } else if (sig == SIGQUIT) {
         VERBOSE("child %d quit", child_pid);
-        return reportTimes(kQuit, params, child_pid, -1, rusage_obj);
+        return ReportTimes(kQuit, params, child_pid, -1, rusage_obj);
       } else {
         VERBOSE("child %d terminated by signal %d (%s)", child_pid, sig,
                 strsignal(sig));
-        return reportTimes(kSignal, params, child_pid, sig, rusage_obj);
+        return ReportTimes(kSignal, params, child_pid, sig, rusage_obj);
       }
     } else {
       VERBOSE("child exited abnormally without signal, pid = %d", child_pid);
-      return reportTimes(kUnknown, params, child_pid, -1, rusage_obj);
+      return ReportTimes(kUnknown, params, child_pid, -1, rusage_obj);
     }
   }
   return 0;
@@ -289,7 +290,7 @@ int main(int argc, char* argv[]) {
   if (char* timeout_env = getenv(kTimeoutEnvVar)) {
     if (timeout_env[0] == '0' && timeout_env[1] == '\0') {
       params.timeout_msec = kEffectiveInfiniteTime;
-    } else if (timeout_env[0] != '0' && isShortDigitStr(timeout_env, 5)) {
+    } else if (timeout_env[0] != '0' && IsShortDigitStr(timeout_env, 5)) {
       params.timeout_msec = atoi(timeout_env);
     } else {
       ERROR_FMT("%s value '%s' is led by '0', not pure digits, or too long",
@@ -308,10 +309,10 @@ int main(int argc, char* argv[]) {
   int command_start = -1;
   for (int i = 1; i < argc; ++i) {
     if (argv[i][0] == '-') {
-      if (matchFlag(argv[i], "-h", "--help")) {
-        printHelp();
+      if (MatchFlag(argv[i], "-h", "--help")) {
+        PrintHelp();
         return 0;
-      } else if (matchFlag(argv[i], "-v", "--verbose")) {
+      } else if (MatchFlag(argv[i], "-v", "--verbose")) {
         g_verbose = true;
       } else {
         ERROR_FMT("option '%s' not recognized, use '-h' for help", argv[i]);
@@ -342,5 +343,5 @@ int main(int argc, char* argv[]) {
                           })
               .c_str());
 
-  return work(params);
+  return Work(params);
 }
