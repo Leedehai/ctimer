@@ -16,7 +16,7 @@ So here you have it:)
 - OS: Linux (kernel 2.6+) or macOS 10.12+ (no Windows, because POSIX is needed)
 - build tool: GNU Make 3.81+
 - compiler: Clang (GCC is not tested but should work) with C++14 standard
-- run tests and samples: Python3.5+
+- run tests and samples: Python3.7+
 
 ## How to build
 ```sh

@@ -4,132 +4,182 @@
 # -----
 # Run test: ./test.py
 
-import os, sys
-import subprocess
 import json
+import os
+import re
+import subprocess
+import sys
 
+# yapf: disable
 TESTS = [
     {
+        # This test case verifies ctimer can handle timeout.
         "file": "samples/infinite.py",
         "child_exit": "timeout",
-        "time": lambda t: t > 1000
+        "child_exit_repr": 1500,
+        "child_exit_desc": "child runtime limit (ms)",
+        "time": lambda t: t >= 1500,
     },
     {
+        # This test case verifies ctimer can handle normal execution
+        # with exit 0.
         "file": "samples/quick.py",
         "child_exit": "return",
+        "child_exit_repr": 0,
+        "child_exit_desc": "exit code",
         "time": lambda t: t < 500
     },
     {
+        # This test case verifies ctimer can handle normal execution with
+        # exit 1. NOTE SIGINT is intercepted by Python so the exit is not
+        # of "signal" type.
         "file": "samples/sigint.py",
         "child_exit": "return",
+        "child_exit_repr": 1,
+        "child_exit_desc": "exit code",
         "time": lambda t: t < 500
     },
     {
+        # This test verifies ctimer can handle a signal exit.
         "file": "samples/sigkill.py",
         "child_exit": "signal",
+        "child_exit_repr": 9,  # SIGKILL value.
+        "child_exit_desc": re.compile(r".*kill.*", re.IGNORECASE),
         "time": lambda t: t < 500
     },
     {
+        # This test case verifies that sleep time (1.0 sec not on processor)
+        # is not included in the time measured.
         "file": "samples/sleep.py",
         "child_exit": "return",
+        "child_exit_repr": 0,
+        "child_exit_desc": "exit code",
         "time": lambda t: t < 500
     },
     {
-        "file": "samples/foo",
+        # This test case verifies that ctimer can handle missing
+        # program.
+        "file": "samples/missing",
         "child_exit": "quit",
+        "child_exit_repr": None,
+        "child_exit_desc": "child error before exec",
         "time": lambda t: t < 50
     },
     {
+        # This test case verifies that ctimer can handle
+        # execution permission error.
         "file": "samples/text.txt",
         "child_exit": "quit",
+        "child_exit_repr": None,
+        "child_exit_desc": "child error before exec",
         "time": lambda t: t < 50
     },
 ]
+# yapf: enable
 
 STATS_FILENAME = "stats.log"
+
+
+def err(s):
+    sys.stderr.write(s + "\n")
 
 
 def run_one(test_item):
     with open(os.devnull,
               'w') as devnull:  # Python2 doesn't have subprocess.DEVNULL
-        exit_code = subprocess.Popen(
-            ' '.join(["./ctimer", test_item["file"]]),
-            shell=True,
-            env={
-                "CTIMER_STATS": STATS_FILENAME
-            },
-            stdout=devnull,
-            stderr=subprocess.STDOUT).wait()
+        exit_code = subprocess.Popen(' '.join(["./ctimer", test_item["file"]]),
+                                     shell=True,
+                                     env={"CTIMER_STATS": STATS_FILENAME},
+                                     stdout=devnull,
+                                     stderr=subprocess.STDOUT).wait()
         if exit_code != 0:
-            print("%s: ctimer exits with %d" % (test_item["file"], exit_code))
+            err("%s: ctimer exits with %d" % (test_item["file"], exit_code))
             return False
     if not os.path.isfile(STATS_FILENAME):
-        print("%s: stat file not found" % test_item["file"])
+        err("%s: stat file not found" % test_item["file"])
         return False
     with open(STATS_FILENAME, 'r') as res_file:
         res_dict = json.load(res_file)
         os.remove(STATS_FILENAME)
 
-        def _has_primary_field(key):
+        def _has_primary_field(key, obj_type):
             if key not in res_dict:
-                print("%s: result missing field '%s'" %
-                      (test_item["file"], key))
+                err("%s: result missing field '%s'" % (test_item["file"], key))
+                return False
+            if not isinstance(res_dict[key], obj_type):
+                err("%s: field '%s' should be of type '%s', but is '%s'" %
+                    (test_item["file"], key, obj_type, type(res_dict[key])))
                 return False
             return True
 
-        def _has_secondary_field(primary, key, obj_type, nullable=False):
+        def _has_secondary_field(primary, key, obj_type, *, nullable=False):
             if key not in res_dict[primary]:
-                print("%s: result missing field '%s' in '%s'" %
-                      (test_item["file"], key, primary))
+                err("%s: result missing field '%s' in '%s'" %
+                    (test_item["file"], key, primary))
                 return False
-            if obj_type != None and type(res_dict[primary][key]) != obj_type:
+            if not isinstance(res_dict[primary][key], obj_type):
                 if (not nullable) or (res_dict[primary][key] != None):
-                    print(
-                        "%s: result field '%s' in '%s' expects to be of type '%s'%s, but is '%s'"
-                        % (test_item["file"], key, primary, obj_type,
-                           "or NoneType" if nullable else "",
-                           type(res_dict[primary][key])))
+                    err("%s: result field '%s' in '%s' should be of type '%s'%s"
+                        ", but is '%s'" %
+                        (test_item["file"], key, primary, obj_type, " or None"
+                         if nullable else "", type(res_dict[primary][key])))
                     return False
             return True
 
-        if not (_has_primary_field("pid") and
-                _has_primary_field("exit") and _has_secondary_field(
-                    "exit", "type", obj_type=None
-                )  # obj_type: Python2: 'unicode', Python3: 'str' - nasty!
-                and _has_secondary_field("exit", "repr", int, True) and
-                _has_secondary_field("exit", "desc", obj_type=None)  # see above
-                and _has_primary_field("times_ms") and
-                _has_secondary_field("times_ms", "total", float) and
-                _has_secondary_field("times_ms", "user", float) and
-                _has_secondary_field("times_ms", "sys", float)):
+        if not (isinstance(res_dict, dict) and _has_primary_field("pid", int)
+                and _has_primary_field("exit", dict)
+                and _has_secondary_field("exit", "type", str)
+                and _has_secondary_field("exit", "repr", int, nullable=True)
+                and _has_secondary_field("exit", "desc", str)
+                and _has_primary_field("times_ms", dict)
+                and _has_secondary_field("times_ms", "total", float)
+                and _has_secondary_field("times_ms", "user", float)
+                and _has_secondary_field("times_ms", "sys", float)):
             return False
         if len(res_dict) != 3:
-            print("%s: result expects 3 fields, %d found" %
-                  (test_item["file"], len(res_dict)))
+            err("%s: result expects 3 fields, %d found" %
+                (test_item["file"], len(res_dict)))
             return False
         if len(res_dict["exit"]) != 3:
-            print("%s: result['exit'] expects 3 fields, %d found" %
-                  (test_item["file"], len(res_dict["exit"])))
+            err("%s: result['exit'] expects 3 fields, %d found" %
+                (test_item["file"], len(res_dict["exit"])))
             return False
         if len(res_dict) != 3:
-            print("%s: result['times_ms'] expects 3 fields, %d found" %
-                  (test_item["file"], len(res_dict["times_ms"])))
+            err("%s: result['times_ms'] expects 3 fields, %d found" %
+                (test_item["file"], len(res_dict["times_ms"])))
             return False
         if res_dict["exit"]["type"] != test_item["child_exit"]:
-            print("%s: exit type expects '%s', but is '%s'" %
-                  (test_item["file"], test_item["child_exit"],
-                   res_dict["exit"]["type"]))
+            err("%s: exit type expects '%s', but is '%s'" %
+                (test_item["file"], test_item["child_exit"],
+                 res_dict["exit"]["type"]))
             return False
+        if res_dict["exit"]["repr"] != test_item["child_exit_repr"]:
+            err("%s: exit repr expects %s, but is %s" %
+                (test_item["file"], test_item["child_exit_repr"],
+                 res_dict["exit"]["repr"]))
+            return False
+        if isinstance(test_item["child_exit_desc"], str):
+            if res_dict["exit"]["desc"] != test_item["child_exit_desc"]:
+                err("%s: exit desc expects '%s', but is '%s'" %
+                    (test_item["file"], test_item["child_exit_desc"],
+                     res_dict["exit"]["desc"]))
+                return False
+        else:  # regex
+            if not test_item["child_exit_desc"].match(res_dict["exit"]["desc"]):
+                err("%s: exit desc expects pattern '%s', but is '%s'" %
+                    (test_item["file"], str(test_item["child_exit_desc"]),
+                     res_dict["exit"]["desc"]))
+                return False
         if test_item["time"](res_dict["times_ms"]["total"]) == False:
-            print("%s: total time %d not in expected range" %
-                  (test_item["file"], test_item["times_ms"]["total"]))
+            err("%s: total time %d not in expected range" %
+                (test_item["file"], test_item["times_ms"]["total"]))
             return False
     return True
 
 
 def main():
     if not os.path.isfile("ctimer"):
-        print("[Error] no executable 'ctimer' found; did you build ctimer?")
+        err("[Error] no executable 'ctimer' found; did you build ctimer?")
         return 1
     error_count = 0
     for test_item in TESTS:

@@ -8,10 +8,10 @@
 
 #include <stdio.h>
 #include <string.h>
-/* C++ std */
+// C++ std.
 #include <numeric>
 #include <string>
-/* POSIX system */
+// POSIX system.
 #include <signal.h>
 #include <sys/errno.h>
 #include <sys/resource.h>
@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 static bool g_verbose = false;
-/* NOTE stderr is unbuffered, while stdout is buffered */
+// NOTE stderr is unbuffered, while stdout is buffered.
 #define VERBOSE(format, ...)              \
   if (g_verbose) {                        \
     fprintf(stderr, "[verbose] ");        \
@@ -42,16 +42,16 @@ static bool g_verbose = false;
 
 enum ChildExit { kReturn, kSignal, kQuit, kTimeout, kUnknown };
 
-static const char* kStatsFilenameEnvVar = "CTIMER_STATS";
-static const char* kTimeoutEnvVar = "CTIMER_TIMEOUT";
-static const char* kDelimiterEnvVar = "CTIMER_DELIMITER";
-/* NOTE do not make kEffectiveInfiniteTime a wider integer type, as Linux's
- *      itimerval struct only accepts 32-bit or narrower integers */
+static const char kStatsFilenameEnvVar[] = "CTIMER_STATS";
+static const char kTimeoutEnvVar[] = "CTIMER_TIMEOUT";
+static const char kDelimiterEnvVar[] = "CTIMER_DELIMITER";
+// NOTE Do not make kEffectiveInfiniteTime a wider integer type, as Linux's
+// itimerval struct only guarantees 32-bit or narrower integers.
 static const unsigned int kEffectiveInfiniteTime =
-    0x7FFFFFFF; /* in msec, over 24 days */
+    0x7FFFFFFF;  // In msec, over 24 days.
 static const unsigned int kDefaultTimeoutMillisec = 1500;
 
-static const char* kHelpMessage = R"(usage: ctimer [-h] [-v] program [args ...]
+static const char kHelpMessage[] = R"(usage: ctimer [-h] [-v] program [args ...]
 
 ctimer: measure a program's processor time
 
@@ -69,7 +69,7 @@ optional environment vairables:
     %-16s  delimiter encompassing the stats string
 )";
 
-static const char* kReportJSONFormat = R"(%s{
+static const char kReportJSONFormat[] = R"(%s{
     "pid" : %d,
     "exit" : {
         "type" : "%s",
@@ -83,13 +83,13 @@ static const char* kReportJSONFormat = R"(%s{
     }
 }%s)";
 
-/** helper: print help */
+/// Helper: print help.
 static void PrintHelp() {
   fprintf(stdout, kHelpMessage, kStatsFilenameEnvVar, kTimeoutEnvVar,
           kDefaultTimeoutMillisec, kDelimiterEnvVar);
 }
 
-/** helper: interpret exit type */
+/// Helper: interpret exit type.
 static const char* GetExitTypeString(ChildExit exit_type) {
   switch (exit_type) {
     case kReturn:
@@ -107,7 +107,7 @@ static const char* GetExitTypeString(ChildExit exit_type) {
   }
 }
 
-/** helper: return description of |exit_numeric_repr| */
+/// Helper: return description of `exit_numeric_repr`.
 static const char* GetExitReprString(ChildExit exit_type,
                                      int exit_numeric_repr) {
   switch (exit_type) {
@@ -126,7 +126,7 @@ static const char* GetExitReprString(ChildExit exit_type,
   }
 }
 
-/** helper: check whether a null-terminated string is all digits */
+/// Helper: check whether a null-terminated string is all digits.
 static bool IsShortDigitStr(const char* s, int maxCount) {
   if (maxCount <= 0) {
     return false;
@@ -143,7 +143,7 @@ static bool IsShortDigitStr(const char* s, int maxCount) {
   return true;
 }
 
-/** helper: compare flag string */
+/// Helper: compare flag string.
 static bool MatchFlag(const char* in,
                       const char* short_flag,
                       const char* long_flag) {
@@ -156,23 +156,23 @@ static bool MatchFlag(const char* in,
   return false;
 }
 
-/**** main works ****/
+/**** Main works ****/
 
 struct WorkParams {
-  /** argument count in command, including the program name */
+  /// Argument count in command, including the program name.
   int argc;
-  /** limit of runtime on processor */
+  /// Limit of runtime on processor.
   unsigned timeout_msec;
-  /** the inspected command: the program name, followed by
-   * whatever args it has, then NULL (i.e. command[argc] == NULL) */
+  /// The inspected command: the program name, followed by
+  /// whatever args it has, then NULL(i.e.command[argc] == NULL).
   char** command;
-  /** the file to write stats; write to stdout if NULL */
+  /// The file to write stats; write to stdout if NULL.
   char* stats_filename;
-  /** delimiter that encompasses the stats string */
+  /// Delimiter that encompasses the stats string.
   char* delimiter;
 };
 
-/** print stats; return 0 on success, 1 otherwise */
+/// Print stats; return 0 on success, 1 otherwise.
 int ReportTimes(ChildExit exit_type,
                 const WorkParams& params,
                 pid_t pid,
@@ -217,7 +217,7 @@ int ReportTimes(ChildExit exit_type,
   return fprintf_ret != -1 ? 0 : 1;
 }
 
-/** main works; return 0 on success, 1 otherwise */
+/// Main works; return 0 on success, 1 otherwise.
 int Work(const WorkParams& params) {
   int t_sec = params.timeout_msec / 1000,
       t_usec = 1000 * (params.timeout_msec % 1000);
@@ -227,17 +227,17 @@ int Work(const WorkParams& params) {
   CHECKED_SYSCALL(child_pid = fork(), "fork", PARENT_ERR);
 
   if (child_pid == 0) {
-    /* child process */
-    /* ITIMER_PROF: decrements when the process executes OR
-     * when the system is executing on behalf of the process. */
-    /* POSIX call execvp() takes the environment variables from the
-     * parent process */
+    // Child process.
+    // ITIMER_PROF: decrements when the process executes OR
+    // when the system is executing on behalf of the process.
+    // POSIX call execvp() takes the environment variables from the
+    // parent process.
     CHECKED_SYSCALL(setitimer(ITIMER_PROF, &interval, 0), "setitimer in child",
                     CHILD_ERR);
     CHECKED_SYSCALL(execvp(params.command[0], params.command), "exec in child",
                     CHILD_ERR);
   } else {
-    /* parent process */
+    // Parent process.
     VERBOSE("child forked; pid %d", child_pid);
     int child_status = 0;
     CHECKED_SYSCALL(waitpid(child_pid, &child_status, 0), "waitpid",
@@ -282,10 +282,10 @@ int main(int argc, char* argv[]) {
 
   WorkParams params;
 
-  /** file to write stats; stdout if NULL */
+  // File to write stats; stdout if NULL.
   params.stats_filename = getenv(kStatsFilenameEnvVar);
 
-  /** time limit for the program */
+  // Time limit for the program.
   params.timeout_msec = kDefaultTimeoutMillisec;
   if (char* timeout_env = getenv(kTimeoutEnvVar)) {
     if (timeout_env[0] == '0' && timeout_env[1] == '\0') {
@@ -299,7 +299,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  /* delimiter that encompasses the stats report */
+  // Delimiter that encompasses the stats report.
   params.delimiter = getenv(kDelimiterEnvVar);
   if (params.delimiter && strlen(params.delimiter) >= 20) {
     ERROR_FMT("delimiter string is too long (>=20): %s", params.delimiter);

@@ -6,7 +6,6 @@ compiler:
 os:
   - osx # the old name for macOS
   - linux
-
 script:
   - make ctimer
   - ./test.py
