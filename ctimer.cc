@@ -8,10 +8,11 @@
 
 #include <stdio.h>
 #include <string.h>
-// C++ std.
+
+#include <cstdlib>
 #include <numeric>
 #include <string>
-// POSIX system.
+
 #include <signal.h>
 #include <sys/errno.h>
 #include <sys/resource.h>
@@ -192,11 +193,20 @@ int ReportStats(ChildExit exit_type,
     snprintf(exit_str_repr, sizeof(exit_str_repr), "null");
   }
 
+  // NOTE Only ru_utime, ru_stime are guaranteed by POSIX; other fields are
+  // implementation-dependent: https://pubs.opengroup.org/onlinepubs/9699919799/
+  // That said, ru_maxrss is present on Linux, macOS. See "man getrusage".
+  long maxrss = rusage_obj.ru_maxrss; // KB on Linux and iOS, B on macOS.
+  if (std::getenv("RUSAGE_SIZE_BYTES")) {
+    maxrss /= 1024;
+  }
+
+
   char buffer[512] = {0};
   int snprintf_ret =
       snprintf(buffer, sizeof(buffer), kReportJSONFormat,
                params.delimiter ? params.delimiter : "", pid,
-               rusage_obj.ru_maxrss,
+               maxrss,
                GetExitTypeString(exit_type), exit_str_repr,
                GetExitReprString(exit_type, exit_numeric_repr),
                child_user_msec + child_sys_msec, child_user_msec,

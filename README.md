@@ -64,6 +64,10 @@ optional environment vairables:
     CTIMER_DELIMITER  delimiter encompassing the stats string
 ```
 
+> On macOS, you need to additionally define environment variable `RUSAGE_SIZE_BYTES`
+in order to get the resident set size right. Unlike Linux, `macOS`'s `getrusage`
+reports the size in bytes (see `man getrusage`).
+
 > To pose no time limit (effectively), use `CTIMER_TIMEOUT=0`.
 
 - Examples:
