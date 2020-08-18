@@ -7,7 +7,8 @@ Often times I find it frustrating that there is no simple, standalone program
 - measure [processor time](https://en.wikipedia.org/wiki/CPU_time) of an
 arbitrary program, including any descendant processes that program may spawn,
 - terminate the program if it exceeds a predefined limit,
-- report exit status and time measurements (msec) in JSON format.
+- report exit status and time measurements in JSON format,
+- can differentiate different exit status: normal, signal, quit, etc.
 
 So here you have it:)
 
@@ -18,6 +19,12 @@ myself in Python, which works fine, but I was not satisfied with the speed, and
 more importantly the need of accomodating both Python2 and Python3 (since not
 everyone uses Python3), and for Python2 I had to write a non-daemonic process
 class, together with a number of other aerobatics.
+
+> Debian/Ubuntu Linux systems typically installed a timer program `/usr/bin/time`
+(you may have to invoke it with `command time`, as `time` might be eclipsed by
+the shell as a reserved word to time commands), which is quite informative (see
+its manpage to find out: `man time`). However, this program is not ubiquitous;
+for example, on macOS `/usr/bin/time` is very basic.
 
 ## Prerequisites
 - OS: Linux (kernel 2.6+) or macOS 10.12+ (no Windows, because POSIX is needed)
