@@ -71,6 +71,7 @@ optional environment vairables:
 
 static const char kReportJSONFormat[] = R"(%s{
     "pid" : %d,
+    "maxrss_kb" : %ld,
     "exit" : {
         "type" : "%s",
         "repr" : %s,
@@ -173,7 +174,7 @@ struct WorkParams {
 };
 
 /// Print stats; return 0 on success, 1 otherwise.
-int ReportTimes(ChildExit exit_type,
+int ReportStats(ChildExit exit_type,
                 const WorkParams& params,
                 pid_t pid,
                 int exit_numeric_repr,
@@ -195,6 +196,7 @@ int ReportTimes(ChildExit exit_type,
   int snprintf_ret =
       snprintf(buffer, sizeof(buffer), kReportJSONFormat,
                params.delimiter ? params.delimiter : "", pid,
+               rusage_obj.ru_maxrss,
                GetExitTypeString(exit_type), exit_str_repr,
                GetExitReprString(exit_type, exit_numeric_repr),
                child_user_msec + child_sys_msec, child_user_msec,
@@ -251,24 +253,24 @@ int Work(const WorkParams& params) {
     if (WIFEXITED(child_status)) {
       int exit_status = WEXITSTATUS(child_status);
       VERBOSE("child %d exited with %d", child_pid, exit_status);
-      return ReportTimes(kReturn, params, child_pid, exit_status, rusage_obj);
+      return ReportStats(kReturn, params, child_pid, exit_status, rusage_obj);
     } else if (WIFSIGNALED(child_status)) {
       int sig = WTERMSIG(child_status);
       if (sig == SIGPROF) {
         VERBOSE("child %d timeout, %d msec", child_pid, params.timeout_msec);
-        return ReportTimes(kTimeout, params, child_pid, params.timeout_msec,
+        return ReportStats(kTimeout, params, child_pid, params.timeout_msec,
                            rusage_obj);
       } else if (sig == SIGQUIT) {
         VERBOSE("child %d quit", child_pid);
-        return ReportTimes(kQuit, params, child_pid, -1, rusage_obj);
+        return ReportStats(kQuit, params, child_pid, -1, rusage_obj);
       } else {
         VERBOSE("child %d terminated by signal %d (%s)", child_pid, sig,
                 strsignal(sig));
-        return ReportTimes(kSignal, params, child_pid, sig, rusage_obj);
+        return ReportStats(kSignal, params, child_pid, sig, rusage_obj);
       }
     } else {
       VERBOSE("child exited abnormally without signal, pid = %d", child_pid);
-      return ReportTimes(kUnknown, params, child_pid, -1, rusage_obj);
+      return ReportStats(kUnknown, params, child_pid, -1, rusage_obj);
     }
   }
   return 0;

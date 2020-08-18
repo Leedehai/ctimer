@@ -19,6 +19,16 @@ TESTS = [
         "child_exit_repr": 1500,
         "child_exit_desc": "child runtime limit (ms)",
         "time": lambda t: t >= 1500,
+        "maxrss": lambda v: v >= 1000,
+    },
+    {
+        # This test case verifies ctimer can handle timeout.
+        "file": "samples/infinite.sh",
+        "child_exit": "timeout",
+        "child_exit_repr": 1500,
+        "child_exit_desc": "child runtime limit (ms)",
+        "time": lambda t: t >= 1500,
+        "maxrss": lambda v: v >= 1000,
     },
     {
         # This test case verifies ctimer can handle normal execution
@@ -27,17 +37,8 @@ TESTS = [
         "child_exit": "return",
         "child_exit_repr": 0,
         "child_exit_desc": "exit code",
-        "time": lambda t: t < 500
-    },
-    {
-        # This test case verifies ctimer can handle normal execution with
-        # exit 1. NOTE SIGINT is intercepted by Python so the exit is not
-        # of "signal" type.
-        "file": "samples/sigint.py",
-        "child_exit": "return",
-        "child_exit_repr": 1,
-        "child_exit_desc": "exit code",
-        "time": lambda t: t < 500
+        "time": lambda t: t < 500,
+        "maxrss": lambda v: v >= 1000,
     },
     {
         # This test verifies ctimer can handle a signal exit.
@@ -45,7 +46,8 @@ TESTS = [
         "child_exit": "signal",
         "child_exit_repr": 9,  # SIGKILL value.
         "child_exit_desc": re.compile(r".*kill.*", re.IGNORECASE),
-        "time": lambda t: t < 500
+        "time": lambda t: t < 500,
+        "maxrss": lambda v: v >= 1000,
     },
     {
         # This test case verifies that sleep time (1.0 sec not on processor)
@@ -54,7 +56,8 @@ TESTS = [
         "child_exit": "return",
         "child_exit_repr": 0,
         "child_exit_desc": "exit code",
-        "time": lambda t: t < 500
+        "time": lambda t: t < 500,
+        "maxrss": lambda v: v >= 1000,
     },
     {
         # This test case verifies that ctimer can handle missing
@@ -63,7 +66,8 @@ TESTS = [
         "child_exit": "quit",
         "child_exit_repr": None,
         "child_exit_desc": "child error before exec",
-        "time": lambda t: t < 50
+        "time": lambda t: t < 50,
+        "maxrss": lambda v: v >= 1000,
     },
     {
         # This test case verifies that ctimer can handle
@@ -72,7 +76,8 @@ TESTS = [
         "child_exit": "quit",
         "child_exit_repr": None,
         "child_exit_desc": "child error before exec",
-        "time": lambda t: t < 50
+        "time": lambda t: t < 50,
+        "maxrss": lambda v: v >= 1000,
     },
 ]
 # yapf: enable
@@ -127,6 +132,7 @@ def run_one(test_item):
             return True
 
         if not (isinstance(res_dict, dict) and _has_primary_field("pid", int)
+                and _has_primary_field("maxrss_kb", int)
                 and _has_primary_field("exit", dict)
                 and _has_secondary_field("exit", "type", str)
                 and _has_secondary_field("exit", "repr", int, nullable=True)
@@ -136,15 +142,19 @@ def run_one(test_item):
                 and _has_secondary_field("times_ms", "user", float)
                 and _has_secondary_field("times_ms", "sys", float)):
             return False
-        if len(res_dict) != 3:
-            err("%s: result expects 3 fields, %d found" %
+        if len(res_dict) != 4:
+            err("%s: result expects 4 fields, %d found" %
                 (test_item["file"], len(res_dict)))
+            return False
+        if not test_item["maxrss"](res_dict["maxrss_kb"]):
+            err("%s: max resident set size %d not in expected range" %
+                (test_item["file"], test_item["maxrss"]))
             return False
         if len(res_dict["exit"]) != 3:
             err("%s: result['exit'] expects 3 fields, %d found" %
                 (test_item["file"], len(res_dict["exit"])))
             return False
-        if len(res_dict) != 3:
+        if len(res_dict["times_ms"]) != 3:
             err("%s: result['times_ms'] expects 3 fields, %d found" %
                 (test_item["file"], len(res_dict["times_ms"])))
             return False

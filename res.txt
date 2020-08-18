@@ -1,0 +1,14 @@
+{
+    "pid" : 55340,
+    "maxrss_kb" : 3192,
+    "exit" : {
+        "type" : "timeout",
+        "repr" : 1500,
+        "desc" : "child runtime limit (ms)"
+    },
+    "times_ms" : {
+        "total" : 1501.640,
+        "user"  : 1497.647,
+        "sys"   : 3.993
+    }
+}
