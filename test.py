@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Leedehai. All rights reserved.
-# Use of this source code is governed under the LICENSE.txt file.
+# Use of this source code is governed under the MIT LICENSE.txt file.
 # -----
 # Run test: ./test.py
 

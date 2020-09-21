@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 Leedehai. All rights reserved.
- * Use of this source code is governed under the LICENSE.txt file.
+ * Use of this source code is governed under the MIT LICENSE.txt file.
  * -----
  * The implementation of ctimer (see README.md for more info).
  * Most could be in C, but I like C++'s grammar sugars like r-strings.
