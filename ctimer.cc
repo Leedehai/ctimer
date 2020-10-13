@@ -71,18 +71,18 @@ optional environment vairables:
 )";
 
 static const char kReportJSONFormat[] = R"(%s{
-    "pid" : %d,
-    "maxrss_kb" : %ld,
-    "exit" : {
-        "type" : "%s",
-        "repr" : %s,
-        "desc" : "%s"
-    },
-    "times_ms" : {
-        "total" : %.3f,
-        "user"  : %.3f,
-        "sys"   : %.3f
-    }
+  "pid" : %d,
+  "maxrss_kb" : %ld,
+  "exit" : {
+    "type" : "%s",
+    "repr" : %s,
+    "desc" : "%s"
+  },
+  "times_ms" : {
+    "total" : %.3f,
+    "user"  : %.3f,
+    "sys"   : %.3f
+  }
 }%s)";
 
 /// Helper: print help.
